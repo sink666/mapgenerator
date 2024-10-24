@@ -36,27 +36,39 @@ fn new_ppm(w: u32, h: u32) -> Image {
     }
 }
 
-fn fill(color: RGB, image: &mut Image) {
+fn basic_fill(color: RGB, image: &mut Image) -> bool {
     for x in 0..image.height {
         for y in 0..image.width {
-            let offset = image.get_offset(x, y).unwrap();
-
-            image.buffer[offset] = color.r;
-            image.buffer[offset + 1] = color.g;
-            image.buffer[offset + 2] = color.b;
+            if let Some(offset) = image.get_offset(x, y) {
+                image.buffer[offset] = color.r;
+                image.buffer[offset + 1] = color.g;
+                image.buffer[offset + 2] = color.b;
+            } else {
+                return false
+            }
         }
     }
+
+    return true
 }
+
+const IMG_W: u32 = 1000;
+const IMG_H: u32 = 1000;
+const RED: RGB = RGB { r:255, g:0, b:0 };
+const GREEN: RGB = RGB { r:0, g:255, b:0 };
+const BLUE: RGB = RGB { r:0, g:0, b:255 };
+const YELLOW: RGB = RGB { r:255, g:255, b:0 };
+const BLACK: RGB = RGB { r:0, g:0, b:0 };
+const WHITE: RGB = RGB { r:255, g:255, b:255 };
 
 fn main() -> std::io::Result<()> {
     let mut f = File::create("test.ppm")?;
-    let mut img = new_ppm(100, 100);
-
+    let mut img = new_ppm(IMG_W, IMG_H);
     let header = format!("P6 {} {} 255\n", img.width, img.height);
-    // let mut buffer: Vec<u8> = vec!(0; (3 * img_width * img_height) as usize);
 
-    let red = RGB { r:255, g:0, b:0 };
-    fill(red, &mut img);
+    if basic_fill(WHITE, &mut img) == true {
+        panic!("Fill failed!");
+    }
     
     println!("writing ppm ...");
 
