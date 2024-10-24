@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Write;
+use rand::distributions::{Distribution, Uniform};
 
 struct RGB {
     r: u8,
@@ -8,8 +9,8 @@ struct RGB {
 }
 
 struct Image {
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
     buffer: Vec<u8>
 }
 
@@ -27,14 +28,14 @@ const IMG_H: u32 = 100;
 const PALETTE: [RGB; 8] = [BLACK, RED, GREEN, BLUE, YELLOW, AQUA, FUCHSIA, WHITE];
 
 impl Image {
-    fn sizeof_buf(&self) -> u32 {
+    fn sizeof_buf(&self) -> usize {
         3 * self.width * self.height
     }
 
-    fn get_offset(&self, x: u32, y: u32) -> Option<usize> {
+    fn get_offset(&self, x: usize, y: usize) -> Option<usize> {
         let offset = (x * 3) + (y * self.width * 3);
         if offset < self.sizeof_buf() {
-            Some(offset as usize)
+            Some(offset)
         } else {
             None
         }
@@ -43,8 +44,8 @@ impl Image {
 
 fn new_ppm(w: u32, h: u32) -> Image {
     Image {
-        width: w,
-        height: h,
+        width: w as usize,
+        height: h as usize,
         buffer: vec!(0; (3 * w * h) as usize),
     }
 }
@@ -83,6 +84,22 @@ fn field_to_img(field: &Vec<u8>, image: &mut Image) -> bool {
     return true
 }
 
+fn noize_field(field: &mut Vec<u8>) {
+    let mut rng = rand::thread_rng();
+    let uni_random = Uniform::from(0..101);
+
+
+    for p in field {
+        let blackorwhite = uni_random.sample(&mut rng);
+
+        *p = if blackorwhite < 50 {
+            continue
+        } else {
+            0
+        }
+    }
+}
+
 fn main() -> std::io::Result<()> {
     let mut f = File::create("test.ppm")?;
     let mut img = new_ppm(IMG_W, IMG_H);
@@ -92,7 +109,7 @@ fn main() -> std::io::Result<()> {
 
     println!("random noise ...");
 
-    
+    noize_field(&mut world_field);
 
     println!("done!");
     
