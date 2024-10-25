@@ -87,7 +87,7 @@ fn field_buf_to_img(state: &mut State) -> bool {
 
 fn noize_field(fbuf: &mut Vec<usize>) {
     let mut rng = rand::thread_rng();
-    let uni_random = Uniform::from(0..101);
+    let uni_random = Uniform::from(1..100);
 
     for p in fbuf {
         let blackorwhite = uni_random.sample(&mut rng);
@@ -100,27 +100,11 @@ fn noize_field(fbuf: &mut Vec<usize>) {
     }
 }
 
-fn fill_edges(state: &mut State) {
-    for y in 0..state.height {
-        state.f_buf[0 + (y * state.width)] = 0;
-        state.f_buf[state.width - 1 + (y * state.width)] = 0;
-    }
-
-    for x in 0..state.width {
-        state.f_buf[x + 0] = 0;
-        state.f_buf[x + ((state.height - 1) * state.width)] = 0;
-    }
-}
-
 fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
     let mut acc: u32 = 0;
 
     // is this a corner or edge? early return.
-    if ux == 0 || ux == state.width-1 {
-        return true
-    }
-
-    if uy == 0 || uy == state.height-1 {
+    if ux == 0 || ux == state.width-1 || uy == 0 || uy == state.height-1 {
         return true
     }
 
@@ -133,8 +117,6 @@ fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
     for p in testp {
         if state.f_buf[state.get_fbuf_pt(p.0, p.1).unwrap()] == 0 {
             acc = acc + 1;
-        } else {
-            continue
         }
     }
 
@@ -153,11 +135,7 @@ fn iterate_landscape(state: &mut State) {
             if should_be_wall(x, y, &state) {
                 fbuf_new.push(0);
             } else {
-                if state.f_buf[state.get_fbuf_pt(x, y).unwrap()] == 0 {
-                    fbuf_new.push(7);
-                } else {
-                    fbuf_new.push(state.f_buf[state.get_fbuf_pt(x, y).unwrap()]);
-                }
+                fbuf_new.push(7);
             }
         }
     }
@@ -175,7 +153,6 @@ fn main() -> std::io::Result<()> {
     println!("generating ...");
 
     noize_field(&mut gstate.f_buf);
-    fill_edges(&mut gstate);
 
     for _ in 0..69 {
         iterate_landscape(&mut gstate);
