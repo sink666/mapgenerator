@@ -15,6 +15,8 @@ struct State {
     f_buf: Vec<usize>
 }
 
+struct Point (usize, usize);
+
 const RED: RGB = RGB { r:255, g:0, b:0 };
 const GREEN: RGB = RGB { r:0, g:255, b:0 };
 const BLUE: RGB = RGB { r:0, g:0, b:255 };
@@ -24,8 +26,8 @@ const FUCHSIA: RGB = RGB { r: 255, g: 0, b: 255 };
 const BLACK: RGB = RGB { r:0, g:0, b:0 };
 const WHITE: RGB = RGB { r:255, g:255, b:255 };
 
-const IMG_W: u32 = 200;
-const IMG_H: u32 = 200;
+const IMG_W: usize = 300;
+const IMG_H: usize = 300;
 const PALETTE: [RGB; 8] = [BLACK, RED, GREEN, BLUE, YELLOW, AQUA, FUCHSIA, WHITE];
 
 impl State {
@@ -56,12 +58,12 @@ impl State {
     }
 }
 
-fn new_state(w: u32, h: u32) -> State {
+fn new_state(w: usize, h: usize) -> State {
     State {
-        width: w as usize,
-        height: h as usize,
-        img_buf: vec!(0; (3 * w * h) as usize),
-        f_buf: vec!(7; (w * h) as usize),
+        width: w,
+        height: h,
+        img_buf: vec!(0; 3 * w * h),
+        f_buf: vec!(7; w * h),
     }
 }
 
@@ -69,7 +71,7 @@ fn field_buf_to_img(state: &mut State) -> bool {
     for y in 0..state.height {
         for x in 0..state.width {
             if let Some(pixel) = state.get_ibuf_pt(x, y) {
-                let color = state.f_buf[x + (y * state.width)];
+                let color = state.f_buf[state.get_fbuf_pt(x, y).unwrap()];
 
                 state.img_buf[pixel] = PALETTE[color].r;
                 state.img_buf[pixel + 1] = PALETTE[color].g;
@@ -90,7 +92,7 @@ fn noize_field(fbuf: &mut Vec<usize>) {
     for p in fbuf {
         let blackorwhite = uni_random.sample(&mut rng);
 
-        *p = if blackorwhite < 50 {
+        *p = if blackorwhite < 65 {
             continue
         } else {
             0
@@ -110,16 +112,59 @@ fn fill_edges(state: &mut State) {
     }
 }
 
-// fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
-//     // is this a wall already? return true
-//     // are 5 points adjacent to this one (3x3) a wall? return true
+fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
+    let mut acc: u32 = 0;
 
-//     if state.f_buf[state.get_fbuf_pt(ux, uy).unwrap()] == 0 {
-//         return true;
-//     }
+    // is this a corner or edge? early return.
+    if ux == 0 || ux == state.width-1 {
+        return true
+    }
 
-//     false
-// }
+    if uy == 0 || uy == state.height-1 {
+        return true
+    }
+
+    let testp: [Point; 8] = [
+        Point (ux-1, uy-1), Point (ux, uy-1), Point (ux+1, uy-1),
+        Point (ux-1, uy), Point (ux+1, uy),
+        Point (ux-1, uy+1), Point (ux, uy+1), Point (ux+1, uy+1)
+    ];
+
+    for p in testp {
+        if state.f_buf[state.get_fbuf_pt(p.0, p.1).unwrap()] == 0 {
+            acc = acc + 1;
+        } else {
+            continue
+        }
+    }
+
+    if acc >= 4 {
+        return true
+    } else {
+        return false
+    }
+}
+
+fn iterate_landscape(state: &mut State) {
+    let mut fbuf_new: Vec<usize> = Vec::new();
+
+    for y in 0..state.height {
+        for x in 0..state.width {
+            if should_be_wall(x, y, &state) {
+                fbuf_new.push(0);
+            } else {
+                if state.f_buf[state.get_fbuf_pt(x, y).unwrap()] == 0 {
+                    fbuf_new.push(7);
+                } else {
+                    fbuf_new.push(state.f_buf[state.get_fbuf_pt(x, y).unwrap()]);
+                }
+            }
+        }
+    }
+
+    state.f_buf = fbuf_new.clone();
+    fbuf_new.clear();
+}
 
 fn main() -> std::io::Result<()> {
     let mut f = File::create("test.ppm")?;
@@ -132,7 +177,12 @@ fn main() -> std::io::Result<()> {
     noize_field(&mut gstate.f_buf);
     fill_edges(&mut gstate);
 
+    for _ in 0..69 {
+        iterate_landscape(&mut gstate);
+    }
+
     println!("done!");
+
     
     println!("writing ppm ...");
 
