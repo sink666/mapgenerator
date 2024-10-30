@@ -26,21 +26,10 @@ struct Point (usize, usize);
 const BLACK: RGB = RGB { r:0, g:0, b:0 };
 const WHITE: RGB = RGB { r:255, g:255, b:255 };
 
-const IMG_W: usize = 100;
-const IMG_H: usize = 100;
-
 impl State {
-    fn sizeof_ibuf(&self) -> usize {
-        3 * self.width * self.height
-    }
-
-    fn sizeof_fbuf(&self) -> usize {
-        self.width * self.height
-    }
-
     fn get_ibuf_pt(&self, x: usize, y: usize) -> Option<usize> {
         let offset = (x * 3) + (y * self.width * 3);
-        if offset < self.sizeof_ibuf() {
+        if offset < (3 * self.width * self.height) {
             Some(offset)
         } else {
             None
@@ -49,7 +38,7 @@ impl State {
 
     fn get_fbuf_pt(&self, x: usize, y: usize) -> Option<usize> {
         let offset = x + (y * self.width);
-        if offset < self.sizeof_fbuf() {
+        if offset < (self.width * self.height) {
             Some(offset)
         } else {
             None
@@ -148,7 +137,7 @@ fn iterate_landscape(state: &mut State) {
 
 fn main() {
     let mut f = File::create("test.ppm").expect("couldn't create file");
-    let mut gstate = new_state(IMG_W, IMG_H);
+    let mut gstate = new_state(100, 100);
     let header = format!("P6 {} {} 255\n", gstate.width, gstate.height);
 
     noize_field(&mut gstate.f_buf);
