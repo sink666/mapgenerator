@@ -8,27 +8,26 @@ struct RGB {
     b: u8
 }
 
+#[derive(Clone, PartialEq)]
+enum Colors {
+    Black,
+    White
+}
+
 struct State {
     width: usize,
     height: usize,
     img_buf: Vec<u8>,
-    f_buf: Vec<usize>
+    f_buf: Vec<Colors>
 }
 
 struct Point (usize, usize);
 
-const RED: RGB = RGB { r:255, g:0, b:0 };
-const GREEN: RGB = RGB { r:0, g:255, b:0 };
-const BLUE: RGB = RGB { r:0, g:0, b:255 };
-const YELLOW: RGB = RGB { r:255, g:255, b:0 };
-const AQUA: RGB = RGB { r: 0, g:255, b: 255 };
-const FUCHSIA: RGB = RGB { r: 255, g: 0, b: 255 };
 const BLACK: RGB = RGB { r:0, g:0, b:0 };
 const WHITE: RGB = RGB { r:255, g:255, b:255 };
 
-const IMG_W: usize = 300;
-const IMG_H: usize = 300;
-const PALETTE: [RGB; 8] = [BLACK, RED, GREEN, BLUE, YELLOW, AQUA, FUCHSIA, WHITE];
+const IMG_W: usize = 100;
+const IMG_H: usize = 100;
 
 impl State {
     fn sizeof_ibuf(&self) -> usize {
@@ -63,7 +62,7 @@ fn new_state(w: usize, h: usize) -> State {
         width: w,
         height: h,
         img_buf: vec!(0; 3 * w * h),
-        f_buf: vec!(7; w * h),
+        f_buf: vec!(Colors::White; w * h),
     }
 }
 
@@ -71,11 +70,14 @@ fn field_buf_to_img(state: &mut State) -> bool {
     for y in 0..state.height {
         for x in 0..state.width {
             if let Some(pixel) = state.get_ibuf_pt(x, y) {
-                let color = state.f_buf[state.get_fbuf_pt(x, y).unwrap()];
+                let c = match state.f_buf[state.get_fbuf_pt(x, y).unwrap()] {
+                    Colors::Black => { BLACK },
+                    Colors::White => { WHITE }
+                };
 
-                state.img_buf[pixel] = PALETTE[color].r;
-                state.img_buf[pixel + 1] = PALETTE[color].g;
-                state.img_buf[pixel + 2] = PALETTE[color].b;
+                state.img_buf[pixel] = c.r;
+                state.img_buf[pixel + 1] = c.g;
+                state.img_buf[pixel + 2] = c.b;
             } else {
                 return false
             }
@@ -85,17 +87,17 @@ fn field_buf_to_img(state: &mut State) -> bool {
     return true
 }
 
-fn noize_field(fbuf: &mut Vec<usize>) {
+fn noize_field(fbuf: &mut Vec<Colors>) {
     let mut rng = rand::thread_rng();
     let uni_random = Uniform::from(1..100);
 
     for p in fbuf {
         let blackorwhite = uni_random.sample(&mut rng);
 
-        *p = if blackorwhite < 65 {
+        *p = if blackorwhite < 45 {
             continue
         } else {
-            0
+            Colors::Black
         }
     }
 }
@@ -105,22 +107,22 @@ fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
 
     // is this a corner or edge? early return.
     if ux == 0 || ux == state.width-1 || uy == 0 || uy == state.height-1 {
-        return true
+        return false
     }
 
-    let testp: [Point; 8] = [
+    let testp: [Point; 9] = [
         Point (ux-1, uy-1), Point (ux, uy-1), Point (ux+1, uy-1),
-        Point (ux-1, uy), Point (ux+1, uy),
+        Point (ux-1, uy), Point(ux, uy), Point (ux+1, uy),
         Point (ux-1, uy+1), Point (ux, uy+1), Point (ux+1, uy+1)
     ];
 
     for p in testp {
-        if state.f_buf[state.get_fbuf_pt(p.0, p.1).unwrap()] == 0 {
+        if state.f_buf[state.get_fbuf_pt(p.0, p.1).unwrap()] == Colors::Black {
             acc = acc + 1;
         }
     }
 
-    if acc >= 4 {
+    if acc >= 5 {
         return true
     } else {
         return false
@@ -128,14 +130,14 @@ fn should_be_wall(ux: usize, uy: usize, state: &State) -> bool {
 }
 
 fn iterate_landscape(state: &mut State) {
-    let mut fbuf_new: Vec<usize> = Vec::new();
+    let mut fbuf_new: Vec<Colors> = Vec::new();
 
     for y in 0..state.height {
         for x in 0..state.width {
             if should_be_wall(x, y, &state) {
-                fbuf_new.push(0);
+                fbuf_new.push(Colors::Black);
             } else {
-                fbuf_new.push(7);
+                fbuf_new.push(Colors::White);
             }
         }
     }
@@ -144,33 +146,21 @@ fn iterate_landscape(state: &mut State) {
     fbuf_new.clear();
 }
 
-fn main() -> std::io::Result<()> {
-    let mut f = File::create("test.ppm")?;
+fn main() {
+    let mut f = File::create("test.ppm").expect("couldn't create file");
     let mut gstate = new_state(IMG_W, IMG_H);
     let header = format!("P6 {} {} 255\n", gstate.width, gstate.height);
 
-
-    println!("generating ...");
-
     noize_field(&mut gstate.f_buf);
 
-    for _ in 0..69 {
+    for _ in 0..20 {
         iterate_landscape(&mut gstate);
     }
-
-    println!("done!");
-
-    
-    println!("writing ppm ...");
 
     if field_buf_to_img(&mut gstate) == false {
         panic!("field to ppm failed!");
     }
 
-    f.write(header.as_bytes())?;
-    f.write(&gstate.img_buf)?;
-
-    println!("done!");
-
-    Ok(())
+    f.write(header.as_bytes()).expect("failed to write header");
+    f.write(&gstate.img_buf).expect("failed to write image data");
 }
