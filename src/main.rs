@@ -17,6 +17,7 @@ enum Colors {
 struct State {
     width: usize,
     height: usize,
+    header: String,
     img_buf: Vec<u8>,
     f_buf: Vec<Colors>
 }
@@ -50,6 +51,7 @@ fn new_state(w: usize, h: usize) -> State {
     State {
         width: w,
         height: h,
+        header: format!("P6 {} {} 255\n", w, h),
         img_buf: vec!(0; 3 * w * h),
         f_buf: vec!(Colors::White; w * h),
     }
@@ -138,7 +140,6 @@ fn iterate_landscape(state: &mut State) {
 fn main() {
     let mut f = File::create("test.ppm").expect("couldn't create file");
     let mut gstate = new_state(100, 100);
-    let header = format!("P6 {} {} 255\n", gstate.width, gstate.height);
 
     noize_field(&mut gstate.f_buf);
 
@@ -150,6 +151,6 @@ fn main() {
         panic!("field to ppm failed!");
     }
 
-    f.write(header.as_bytes()).expect("failed to write header");
+    f.write(gstate.header.as_bytes()).expect("failed to write header");
     f.write(&gstate.img_buf).expect("failed to write image data");
 }
