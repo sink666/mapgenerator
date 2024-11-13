@@ -1,6 +1,8 @@
 use std::io;
+use std::fmt;
 use std::fs::File;
 use std::io::Write;
+use std::error::Error;
 use rand::distributions::{Distribution, Uniform};
 
 struct RGB {
@@ -20,11 +22,38 @@ struct State {
     height: usize,
     iter_c: usize,
     header: String,
-    img_buf: Vec<u8>,
     f_buf: Vec<Colors>
 }
 
 struct Point (usize, usize);
+
+#[derive(Debug)]
+enum GenErrors {
+    IOError(std::io::Error),
+}
+
+impl Error for GenErrors {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match *self {
+            GenErrors::IOError(ref e) => Some(e)
+        }
+    }
+}
+
+impl fmt::Display for GenErrors {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            GenErrors::IOError(..) => 
+                write!(f, "error during file IO"),
+        }
+    }
+}
+
+impl From<std::io::Error> for GenErrors {
+    fn from(error: std::io::Error) -> GenErrors {
+        GenErrors::IOError(error)
+    }
+}
 
 const BLACK: RGB = RGB { r:0, g:0, b:0 };
 const WHITE: RGB = RGB { r:255, g:255, b:255 };
@@ -35,7 +64,6 @@ fn new_state(w: usize, h: usize, i: usize) -> State {
         height: h,
         iter_c: i,
         header: format!("P6 {} {} 255\n", w, h),
-        img_buf: vec!(0; 3 * w * h),
         f_buf: vec!(Colors::White; w * h),
     }
 }
@@ -99,33 +127,31 @@ fn gen_landscape(st: &mut State) {
     }
 }
 
-fn output_file(st: &mut State) -> io::Result<()> {
+fn output_file(st: &mut State) -> Result<(), io::Error> {
     let mut f = File::create("test.ppm")?;
+    let mut img_buf: Vec<u8> = Vec::new();
 
-    for y in 0..st.height {
-        for x in 0..st.width {
-            let i_ofs = (x * 3) + (y * st.width * 3);
-            let color = match st.f_buf.get(x + (y * st.width)).unwrap() {
-                &Colors::Black => BLACK,
-                &Colors::White => WHITE
-            };
-            
-            st.img_buf[i_ofs] = color.r;
-            st.img_buf[i_ofs + 1] = color.g;
-            st.img_buf[i_ofs + 2] = color.b;
-        }
+    for pixel in &st.f_buf {
+        let color = match pixel {
+            Colors::Black => BLACK,
+            Colors::White => WHITE,
+        };
+
+        img_buf.append(&mut vec![color.r, color.g, color.b]);
     }
 
     f.write(st.header.as_bytes())?;
-    f.write(&st.img_buf)?;
+    f.write(&img_buf)?;
 
     Ok(())
 }
 
-fn main() {
+fn main() -> Result<(), GenErrors> {
     let mut gstate = new_state(100, 100, 20);
 
     gen_landscape(&mut gstate);
 
-    output_file(&mut gstate).unwrap();
+    output_file(&mut gstate)?;
+
+    Ok(())
 }
